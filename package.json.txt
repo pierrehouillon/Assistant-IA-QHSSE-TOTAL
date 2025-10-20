@@ -1,0 +1,8 @@
+{
+  "name": "assistant-qhsse-total",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "openai": "^4.58.1"
+  }
+}

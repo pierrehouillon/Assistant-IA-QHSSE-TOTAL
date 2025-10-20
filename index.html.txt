@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Assistant QHSSE TOTAL</title>
+  <style>
+    :root { --gap: 12px; }
+    * { box-sizing: border-box; }
+    body{font-family:system-ui,Arial;margin:0;padding:16px;max-width:800px}
+    header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    h1{font-size:20px;margin:0}
+    .card{border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin:12px 0}
+    .row{display:flex;gap:var(--gap)}
+    input,button{font-size:16px;padding:12px;border-radius:10px;border:1px solid #d1d5db}
+    input{flex:1}
+    button{cursor:pointer}
+    .answer{white-space:pre-wrap;line-height:1.4}
+    .muted{color:#6b7280;font-size:14px;margin-top:8px}
+    .loading{opacity:0.7}
+  </style>
+</head>
+<body>
+  <header><h1>Assistant QHSSE TOTAL</h1></header>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:var(--gap);">
+      <input id="q" placeholder="Pose ta question… (ex : Puis-je utiliser un escabeau ?)" />
+      <button id="go">Envoyer</button>
+    </div>
+    <div id="out" class="answer muted">Aucune question posée pour l’instant.</div>
+  </div>
+
+  <p class="muted">
+    Les réponses proviennent exclusivement du document QHSSE TOTAL indexé. Si l’information n’est pas présente, la réponse l’indiquera explicitement.
+  </p>
+
+  <script>
+    // Comme la page et l'API sont sur le même domaine Vercel, on appelle l'API en relatif :
+    const API_URL = "/api/ask";
+
+    const qEl = document.getElementById("q");
+    const goEl = document.getElementById("go");
+    const outEl = document.getElementById("out");
+
+    async function ask(){
+      const question = qEl.value.trim();
+      if(!question) return;
+      outEl.textContent = "⏳ Recherche dans le document…";
+      outEl.classList.add("loading");
+      try{
+        const r = await fetch(API_URL, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ question })
+        });
+        const data = await r.json();
+        outEl.classList.remove("muted");
+        outEl.textContent = data?.answer || "❌ Pas de réponse.";
+      }catch(e){
+        outEl.classList.remove("muted");
+        outEl.textContent = "❌ Erreur : " + (e?.message || "requête échouée");
+      }finally{
+        outEl.classList.remove("loading");
+      }
+    }
+
+    goEl.addEventListener("click", ask);
+    qEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") ask(); });
+
+    // support ?q=... pour tests
+    const u = new URL(window.location.href);
+    const initial = u.searchParams.get("q");
+    if (initial) { qEl.value = initial; ask(); }
+  </script>
+</body>
+</html>
