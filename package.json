@@ -1,7 +1,12 @@
 {
-  "name": "assistant-qhsse-total",
+  "name": "assistant-ia-qhsse-total",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build": "echo 'Building project...'",
+    "start": "vercel dev"
+  },
   "dependencies": {
     "openai": "^4.58.1"
   }
