@@ -5,108 +5,78 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <title>Assistant Sécurité Réseau 2025</title>
 
-  <!-- ✅ Police "Inter" comme sur Glide -->
+  <!-- Police Inter (comme Glide) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
   <style>
-    :root {
-      --gap: 12px;
-      --radius: 14px;
-      --border: #e5e7eb;
-      --muted: #6b7280;
-      --primary: #d71920; /* Rouge TotalEnergies / Peduzzi */
+    :root{
+      --gap:12px; --radius:14px; --border:#e5e7eb; --muted:#6b7280; --primary:#d71920;
+      --bg-soft:#fafafa; --ok:#059669;
     }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      padding: 16px;
-      max-width: 800px;
-      font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #fff;
-      color: #111827;
-      -webkit-font-smoothing: antialiased;
+    *{box-sizing:border-box}
+    body{
+      margin:0; padding:16px; max-width:800px;
+      font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      color:#111827; background:#fff; -webkit-font-smoothing:antialiased;
     }
-
-    .card {
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px;
-      margin: 12px 0;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    .topbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px}
+    .ghost-btn{
+      appearance:none;border:1px solid var(--border);background:#fff;color:#111827;
+      padding:8px 12px;border-radius:999px;font-size:14px;cursor:pointer;
     }
+    .ghost-btn:hover{background:#f8f8f8}
 
-    .row {
-      display: flex;
-      gap: var(--gap);
-      align-items: center;
+    .flash{
+      display:none; align-items:center; gap:8px;
+      border:1px solid #d1fae5; background:#ecfdf5; color:#065f46;
+      padding:8px 12px; border-radius:999px; font-size:13px;
+      animation:fade 0.25s ease;
     }
+    .flash.show{display:inline-flex}
+    @keyframes fade{from{opacity:.2;transform:translateY(-2px)}to{opacity:1;transform:none}}
 
-    input {
-      flex: 1;
-      font-size: 16px;
-      padding: 14px 12px;
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-      outline: none;
-      background: #fafafa;
-      transition: border 0.2s, background 0.2s;
+    .card{
+      border:1px solid var(--border); border-radius:var(--radius);
+      padding:16px; margin:12px 0; box-shadow:0 2px 4px rgba(0,0,0,.04);
     }
+    .row{display:flex;gap:var(--gap); align-items:center}
 
-    input:focus {
-      border-color: var(--primary);
-      background: #fff;
+    input{
+      flex:1; font-size:16px; padding:14px 12px; border-radius:var(--radius);
+      border:1px solid var(--border); outline:none; background:var(--bg-soft);
+      transition:border .2s, background .2s;
     }
+    input:focus{border-color:var(--primary); background:#fff}
 
-    button {
-      font-size: 16px;
-      padding: 14px 18px;
-      border-radius: var(--radius);
-      border: none;
-      background: var(--primary);
-      color: white;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.2s;
+    button.primary{
+      font-size:16px; padding:14px 18px; border-radius:var(--radius);
+      border:none; background:var(--primary); color:#fff; font-weight:500; cursor:pointer;
+      transition:background .2s;
     }
+    button.primary:hover{background:#b41319}
 
-    button:hover {
-      background: #b41319;
-    }
+    .answer{white-space:pre-wrap; line-height:1.5; margin-top:12px}
+    .muted{color:var(--muted); font-size:14px; margin-top:10px}
+    .loading{opacity:.7}
 
-    .answer {
-      white-space: pre-wrap;
-      line-height: 1.5;
-      margin-top: 12px;
-    }
-
-    .muted {
-      color: var(--muted);
-      font-size: 14px;
-      margin-top: 10px;
-    }
-
-    .loading {
-      opacity: 0.7;
-    }
-
-    @media (max-width: 600px) {
-      input, button {
-        font-size: 15px;
-      }
+    @media (max-width:600px){
+      input,button.primary{font-size:15px}
+      .topbar{justify-content:space-between}
     }
   </style>
 </head>
-
 <body>
 
-  <!-- ✅ Le titre sera ajouté depuis Glide (supprimé ici) -->
+  <!-- Barre discrète : bouton + confirmation -->
+  <div class="topbar">
+    <span id="flash" class="flash">🆕 Nouveau sujet lancé</span>
+    <button id="newTopic" class="ghost-btn" aria-label="Nouveau sujet">Nouveau sujet</button>
+  </div>
 
   <div class="card">
-    <div class="row" style="margin-bottom: var(--gap);">
+    <div class="row" style="margin-bottom:12px;">
       <input id="q" placeholder="Pose ta question… (ex : Puis-je utiliser un escabeau ?)" />
-      <button id="go">Envoyer</button>
+      <button id="go" class="primary">Envoyer</button>
     </div>
     <div id="out" class="answer muted">Aucune question posée pour l’instant.</div>
   </div>
@@ -118,9 +88,30 @@
 
   <script>
     const API_URL = "/api/ask";
+
     const qEl = document.getElementById("q");
     const goEl = document.getElementById("go");
     const outEl = document.getElementById("out");
+    const newBtn = document.getElementById("newTopic");
+    const flash = document.getElementById("flash");
+
+    // On retient le thread courant en local pour enchaîner les questions
+    let threadId = localStorage.getItem("q_thread") || null;
+
+    function showFlash() {
+      flash.classList.add("show");
+      setTimeout(() => flash.classList.remove("show"), 1600);
+    }
+
+    function startNewTopic() {
+      threadId = null;
+      localStorage.removeItem("q_thread");
+      qEl.value = "";
+      qEl.focus();
+      outEl.classList.add("muted");
+      outEl.textContent = "Nouveau sujet démarré. Pose ta première question.";
+      showFlash();
+    }
 
     async function ask() {
       const question = qEl.value.trim();
@@ -133,15 +124,22 @@
         const r = await fetch(API_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question })
+          body: JSON.stringify({ question, threadId })
         });
-
         const data = await r.json();
+
+        // on mémorise le thread renvoyé (pour conversation continue)
+        if (data?.threadId) {
+          threadId = data.threadId;
+          localStorage.setItem("q_thread", threadId);
+        }
+
         outEl.classList.remove("muted");
         outEl.textContent = data?.answer || "❌ Pas de réponse.";
 
-        // 🧹 Vide le champ après envoi
+        // vider le champ et remettre le focus
         qEl.value = "";
+        qEl.focus();
       } catch (e) {
         outEl.classList.remove("muted");
         outEl.textContent = "❌ Erreur : " + (e?.message || "requête échouée");
@@ -150,13 +148,14 @@
       }
     }
 
+    newBtn.addEventListener("click", startNewTopic);
     goEl.addEventListener("click", ask);
-    qEl.addEventListener("keydown", (e) => { if (e.key === "Enter") ask(); });
+    qEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") ask(); });
 
-    // Support pour ?q= dans l'URL (test rapide)
+    // Support test avec ?q=
     const u = new URL(window.location.href);
     const initial = u.searchParams.get("q");
-    if (initial) { qEl.value = initial; ask(); }
+    if (initial) { startNewTopic(); qEl.value = initial; ask(); }
   </script>
 </body>
 </html>
