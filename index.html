@@ -2,49 +2,172 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <title>Assistant (webview)</title>
   <style>
-    :root { --gap: 12px; }
+    :root { --gap: 12px; --radius: 14px; --border: #e5e7eb; --muted: #6b7280; }
     * { box-sizing: border-box; }
-    body{font-family:system-ui,Arial;margin:0;padding:16px;max-width:800px}
-    header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-    .card{border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin:12px 0}
-    .row{display:flex;gap:var(--gap)}
-    input,button{font-size:16px;padding:12px;border-radius:10px;border:1px solid #d1d5db}
-    input{flex:1}
-    button{cursor:pointer}
-    .answer{white-space:pre-wrap;line-height:1.5}
-    .muted{color:#6b7280;font-size:14px;margin-top:8px}
-    .loading{opacity:0.7}
-    .toolbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px}
-    .pill{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid #e5e7eb;background:#f9fafb}
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: #fff;
+      color: #111827;
+    }
+
+    /* Layout plein écran mobile avec zone scroll + composer collé en bas */
+    .shell {
+      min-height: 100dvh; /* gère les barres d’UI mobiles */
+      display: flex;
+      flex-direction: column;
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+
+    .content {
+      flex: 1 1 auto;
+      padding: 16px;
+      padding-bottom: 8px;
+      max-width: 820px;
+      margin: 0 auto;
+      width: 100%;
+      overflow: auto;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      background: #fff;
+    }
+
+    .answer {
+      white-space: pre-wrap;
+      line-height: 1.55;
+    }
+
+    .muted { color: var(--muted); }
+    .loading { opacity: .7; }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      color: #374151;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .small-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    /* Composer collé en bas */
+    .composer-wrap {
+      position: sticky;
+      bottom: 0;
+      left: 0; right: 0;
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+      background: #fff;
+      border-top: 1px solid var(--border);
+    }
+    .composer {
+      display: flex;
+      gap: 10px;
+      max-width: 820px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    input, button {
+      border-radius: 12px;
+      border: 1px solid #d1d5db;
+      font-size: 16px;
+      padding: 14px 14px;
+    }
+    input {
+      flex: 1 1 auto;
+      min-height: 46px;
+    }
+    button {
+      flex: 0 0 auto;
+      padding-inline: 16px;
+      cursor: pointer;
+      background: #111827;
+      color: #fff;
+      border: 1px solid #111827;
+      min-width: 100px;        /* plus facile à toucher */
+      touch-action: manipulation;
+    }
+    button:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+
+    /* Note bas de page */
+    .note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* Petites améliorations pour très petits écrans */
+    @media (max-width: 380px) {
+      button { min-width: 88px; }
+      .pill { max-width: 70%; }
+    }
   </style>
 </head>
 <body>
-  <!-- Pas de titre ici : tu le mets dans Glide -->
+  <div class="shell">
+    <main class="content">
+      <div class="card">
+        <div id="out" class="answer muted">Aucune question posée pour l’instant.</div>
 
-  <div class="card">
-    <div class="row" style="margin-bottom:var(--gap);">
-      <input id="q" placeholder="Pose ta question… (ex : Puis-je utiliser un escabeau ?)" />
-      <button id="go">Envoyer</button>
+        <div class="toolbar">
+          <span id="ctx" class="pill">Mode : conversation</span>
+          <button id="reset" class="small-btn" title="Oublier le contexte (nouveau sujet)">Nouveau sujet</button>
+        </div>
+      </div>
+
+      <p class="note">
+        Les réponses proviennent exclusivement du manuel <strong>Sécurité Travaux Réseau 2025</strong> de TotalEnergies.
+        Si l'information n'est pas présente, la réponse l'indiquera explicitement.
+      </p>
+    </main>
+
+    <!-- Composer collé en bas -->
+    <div class="composer-wrap">
+      <div class="composer">
+        <input id="q"
+               placeholder="Pose ta question… (ex : Puis-je utiliser un escabeau ?)"
+               inputmode="text"
+               autocomplete="off"
+               autocapitalize="off"
+               autocorrect="off"
+               enterkeyhint="send"
+               />
+        <button id="go">Envoyer</button>
+      </div>
     </div>
-
-    <div class="toolbar">
-      <span id="ctx" class="pill">Mode : conversation</span>
-      <button id="reset" title="Oublier le contexte (nouveau sujet)">Nouveau sujet</button>
-    </div>
-
-    <div id="out" class="answer muted" style="margin-top:12px;">Aucune question posée pour l’instant.</div>
   </div>
 
-  <p class="muted">
-    Les réponses proviennent exclusivement du manuel <strong>Sécurité Travaux Réseau 2025</strong> de TotalEnergies.
-    Si l'information n'est pas présente, la réponse l'indiquera explicitement.
-  </p>
-
   <script>
-    // API sur le même domaine Vercel
     const API_URL = "/api/ask";
 
     const qEl = document.getElementById("q");
@@ -61,9 +184,17 @@
 
     async function ask(){
       const question = qEl.value.trim();
-      if(!question) return;
+      if(!question) {
+        qEl.focus();
+        return;
+      }
       setBusy(true);
       try{
+        // Efface l’input immédiatement pour permettre d’enchaîner
+        qEl.value = "";
+        // Garde le focus dans le champ (smartphone: permet d’enchaîner direct)
+        setTimeout(() => qEl.focus(), 0);
+
         outEl.classList.remove("muted");
         outEl.textContent = "⏳ Recherche dans le document…";
 
@@ -118,13 +249,14 @@
     }
 
     goEl.addEventListener("click", ask);
-    resetEl.addEventListener("click", resetThread);
     qEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") ask(); });
 
-    // support ?q=... pour tests
+    // support ?q=... pour tests rapides
     const u = new URL(window.location.href);
     const initial = u.searchParams.get("q");
     if (initial) { qEl.value = initial; ask(); }
   </script>
 </body>
 </html>
+
+
