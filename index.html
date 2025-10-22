@@ -11,202 +11,93 @@
     body {
       margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #fff;
-      color: #111827;
+      background: #fff; color: #111827;
+      -webkit-user-select: text; user-select: text;
+      -webkit-touch-callout: none;
     }
-
-    /* Layout plein écran mobile avec zone scroll + composer collé en bas */
-    .shell {
-      min-height: 100dvh; /* gère les barres d’UI mobiles */
-      display: flex;
-      flex-direction: column;
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
-    }
-
-    .content {
-      flex: 1 1 auto;
+    .wrap {
+      min-height: 100dvh;
       padding: 16px;
-      padding-bottom: 8px;
-      max-width: 820px;
-      margin: 0 auto;
-      width: 100%;
-      overflow: auto;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom));
+      max-width: 820px; margin: 0 auto;
+      display: flex; flex-direction: column; gap: 12px;
     }
-
-    .card {
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px;
-      background: #fff;
-    }
-
-    .answer {
-      white-space: pre-wrap;
-      line-height: 1.55;
-    }
-
+    .card { border:1px solid var(--border); border-radius: var(--radius); padding:14px; background:#fff; }
+    .answer { white-space: pre-wrap; line-height:1.55; }
     .muted { color: var(--muted); }
     .loading { opacity: .7; }
-
-    .toolbar {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 10px;
-      flex-wrap: wrap;
-    }
-    .pill {
-      font-size: 12px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: #f9fafb;
-      color: #374151;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .small-btn {
-      border: 1px solid var(--border);
-      background: #fff;
-      border-radius: 999px;
-      padding: 8px 12px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    /* Composer collé en bas */
-    .composer-wrap {
-      position: sticky;
-      bottom: 0;
-      left: 0; right: 0;
-      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-      background: #fff;
-      border-top: 1px solid var(--border);
-    }
-    .composer {
-      display: flex;
-      gap: 10px;
-      max-width: 820px;
-      margin: 0 auto;
-      width: 100%;
-    }
+    .row { display:flex; gap:10px; }
     input, button {
-      border-radius: 12px;
-      border: 1px solid #d1d5db;
-      font-size: 16px;
-      padding: 14px 14px;
-    }
-    input {
-      flex: 1 1 auto;
-      min-height: 46px;
-    }
-    button {
-      flex: 0 0 auto;
-      padding-inline: 16px;
-      cursor: pointer;
-      background: #111827;
-      color: #fff;
-      border: 1px solid #111827;
-      min-width: 100px;        /* plus facile à toucher */
+      border-radius: 12px; border: 1px solid #d1d5db;
+      font-size: 16px; padding: 14px;
       touch-action: manipulation;
     }
-    button:disabled {
-      opacity: .6;
-      cursor: not-allowed;
+    input { flex: 1 1 auto; min-height: 46px; }
+    button {
+      background:#111827; color:#fff; border:1px solid #111827;
+      min-width: 100px; cursor: pointer;
     }
-
-    /* Note bas de page */
-    .note {
-      margin-top: 12px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    /* Petites améliorations pour très petits écrans */
-    @media (max-width: 380px) {
-      button { min-width: 88px; }
-      .pill { max-width: 70%; }
-    }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .toolbar { display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    .pill { font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid var(--border); background:#f9fafb; color:#374151; }
+    .note { font-size:14px; color:var(--muted); }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <main class="content">
-      <div class="card">
-        <div id="out" class="answer muted">Aucune question posée pour l’instant.</div>
-
-        <div class="toolbar">
-          <span id="ctx" class="pill">Mode : conversation</span>
-          <button id="reset" class="small-btn" title="Oublier le contexte (nouveau sujet)">Nouveau sujet</button>
-        </div>
-      </div>
-
-      <p class="note">
-        Les réponses proviennent exclusivement du manuel <strong>Sécurité Travaux Réseau 2025</strong> de TotalEnergies.
-        Si l'information n'est pas présente, la réponse l'indiquera explicitement.
-      </p>
-    </main>
-
-    <!-- Composer collé en bas -->
-    <div class="composer-wrap">
-      <div class="composer">
-        <input id="q"
-               placeholder="Pose ta question… (ex : Puis-je utiliser un escabeau ?)"
-               inputmode="text"
-               autocomplete="off"
-               autocapitalize="off"
-               autocorrect="off"
-               enterkeyhint="send"
-               />
-        <button id="go">Envoyer</button>
+  <div class="wrap">
+    <!-- Zone réponse -->
+    <div class="card">
+      <div id="out" class="answer muted">Aucune question posée pour l’instant.</div>
+      <div class="toolbar" style="margin-top:10px;">
+        <span id="ctx" class="pill">Mode : conversation</span>
+        <button id="reset" title="Oublier le contexte (nouveau sujet)">Nouveau sujet</button>
       </div>
     </div>
+
+    <!-- Zone saisie (en haut pour compat WebView) -->
+    <div class="row">
+      <input id="q"
+             placeholder="Pose ta question… (ex : Puis-je utiliser un escabeau ?)"
+             inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" enterkeyhint="send" />
+      <button id="go">Envoyer</button>
+    </div>
+
+    <p class="note">
+      Les réponses proviennent exclusivement du manuel <strong>Sécurité Travaux Réseau 2025</strong> de TotalEnergies.
+      Si l'information n'est pas présente, la réponse l'indiquera explicitement.
+    </p>
   </div>
 
   <script>
     const API_URL = "/api/ask";
-
     const qEl = document.getElementById("q");
     const goEl = document.getElementById("go");
     const outEl = document.getElementById("out");
     const resetEl = document.getElementById("reset");
     const ctxEl = document.getElementById("ctx");
 
-    // Thread persistant (contexte) stocké côté client
     const THREAD_KEY = "qhsse_thread_id";
     let threadId = localStorage.getItem(THREAD_KEY) || null;
-
     updateCtxBadge();
 
     async function ask(){
       const question = qEl.value.trim();
-      if(!question) {
-        qEl.focus();
-        return;
-      }
+      if (!question) { qEl.focus(); return; }
       setBusy(true);
-      try{
-        // Efface l’input immédiatement pour permettre d’enchaîner
+      try {
+        // Efface le champ + remet le focus pour enchaîner
         qEl.value = "";
-        // Garde le focus dans le champ (smartphone: permet d’enchaîner direct)
         setTimeout(() => qEl.focus(), 0);
 
         outEl.classList.remove("muted");
         outEl.textContent = "⏳ Recherche dans le document…";
 
-        const payload = { question };
-        if (threadId) payload.threadId = threadId;
-
+        const payload = threadId ? { question, threadId } : { question };
         const r = await fetch(API_URL, {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-
         const data = await r.json();
 
         if (data?.threadId && data.threadId !== threadId) {
@@ -215,17 +106,13 @@
           updateCtxBadge();
         }
 
-        if (data?.answer) {
-          outEl.textContent = data.answer;
-        } else if (data?.error) {
-          outEl.textContent = "❌ Erreur : " + data.error;
-        } else {
-          outEl.textContent = "❌ Pas de réponse.";
-        }
-      }catch(e){
+        if (data?.answer) outEl.textContent = data.answer;
+        else if (data?.error) outEl.textContent = "❌ Erreur : " + data.error;
+        else outEl.textContent = "❌ Pas de réponse.";
+      } catch (e) {
         outEl.classList.remove("muted");
         outEl.textContent = "❌ Erreur : " + (e?.message || "requête échouée");
-      }finally{
+      } finally {
         setBusy(false);
       }
     }
@@ -251,12 +138,13 @@
     goEl.addEventListener("click", ask);
     qEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") ask(); });
 
-    // support ?q=... pour tests rapides
+    // test rapide ?q=...
     const u = new URL(window.location.href);
     const initial = u.searchParams.get("q");
     if (initial) { qEl.value = initial; ask(); }
   </script>
 </body>
 </html>
+
 
 
