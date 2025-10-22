@@ -3,10 +3,11 @@ import OpenAI from "openai";
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const VECTOR_STORE_ID = process.env.VECTOR_STORE_ID;
 
+// CORS basique
 function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Origin", "*");           // ou ton domaine Glide si tu veux restreindre
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
 export default async function handler(req, res) {
@@ -22,34 +23,45 @@ export default async function handler(req, res) {
 
     const response = await client.responses.create({
       model: "gpt-4o-mini",
-      tools: [{ type: "file_search" }],  // on déclare l’outil
+      // ⚠️ Le schéma 'input' doit être une liste de messages avec des "content parts"
       input: [
         {
           role: "system",
-          content:
-            "Tu es un assistant QHSSE. Réponds uniquement à partir du document QHSSE TOTAL indexé. " +
-            "Si l’information n’est pas présente, réponds : « Non précisé dans le document QHSSE TOTAL. » " +
-            "Réponds toujours en français."
+          content: [
+            {
+              type: "text",
+              text:
+                "Tu es un assistant QHSSE. Réponds uniquement à partir du document QHSSE TOTAL. " +
+                'Si la réponse n’est pas dans le document, dis : "Non précisé dans le document QHSSE TOTAL." ' +
+                "Réponds en français, de manière claire et concise.",
+            },
+          ],
         },
         {
           role: "user",
-          content: question,
-          // 🔹 ICI on attache le vector store pour file_search
-          attachments: [
-            {
-              tools: [{ type: "file_search" }],
-              vector_store_id: VECTOR_STORE_ID
-            }
-          ]
-        }
+          content: [{ type: "input_text", text: question }],
+        },
       ],
-      max_output_tokens: 500
+
+      // On active l’outil de recherche
+      tools: [{ type: "file_search" }],
+      tool_choice: "auto",
+
+      // ✅ C'est ICI qu'on branche le Vector Store
+      tool_resources: {
+        file_search: { vector_store_ids: [VECTOR_STORE_ID] },
+      },
+
+      max_output_tokens: 400,
     });
 
-    const answer = (response.output_text || "").trim();
-    res.status(200).json({ answer: answer || "Non précisé dans le document QHSSE TOTAL." });
+    const answer = response.output_text?.trim() || "Aucune réponse.";
+    return res.status(200).json({ answer });
   } catch (e) {
-    console.error("Erreur API:", e?.response?.data || e);
-    res.status(500).json({ error: e?.message || "Erreur interne lors de l'appel à l'API OpenAI" });
+    // renvoyer l'erreur brute aide au debug dans l'onglet Network
+    return res.status(500).json({
+      error: e?.message || "Erreur serveur",
+      raw: e?.response?.data || null,
+    });
   }
 }
