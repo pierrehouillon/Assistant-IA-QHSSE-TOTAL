@@ -38,9 +38,24 @@
       min-width: 100px; cursor: pointer;
     }
     button:disabled { opacity:.6; cursor:not-allowed; }
-    .toolbar { display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
-    .pill { font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid var(--border); background:#f9fafb; color:#374151; }
+
+    .toolbar { display:flex; gap:8px; align-items:center; justify-content:flex-end; }
+    /* on cache le badge de mode conversation */
+    #ctx { display:none; }
+
     .note { font-size:14px; color:var(--muted); }
+
+    /* Toast de confirmation */
+    .toast {
+      position: fixed;
+      left: 50%; bottom: calc(16px + env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      background: #10b981; color: white;
+      padding: 10px 14px; border-radius: 999px;
+      font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.15);
+      opacity: 0; pointer-events: none; transition: opacity .2s ease;
+    }
+    .toast.show { opacity: 1; }
   </style>
 </head>
 <body>
@@ -49,12 +64,12 @@
     <div class="card">
       <div id="out" class="answer muted">Aucune question posée pour l’instant.</div>
       <div class="toolbar" style="margin-top:10px;">
-        <span id="ctx" class="pill">Mode : conversation</span>
+        <span id="ctx">Mode : conversation</span>
         <button id="reset" title="Oublier le contexte (nouveau sujet)">Nouveau sujet</button>
       </div>
     </div>
 
-    <!-- Zone saisie (en haut pour compat WebView) -->
+    <!-- Zone saisie -->
     <div class="row">
       <input id="q"
              placeholder="Pose ta question… (ex : Puis-je utiliser un escabeau ?)"
@@ -68,24 +83,26 @@
     </p>
   </div>
 
+  <!-- petit toast de confirmation -->
+  <div id="toast" class="toast">Nouveau sujet activé</div>
+
   <script>
     const API_URL = "/api/ask";
     const qEl = document.getElementById("q");
     const goEl = document.getElementById("go");
     const outEl = document.getElementById("out");
     const resetEl = document.getElementById("reset");
-    const ctxEl = document.getElementById("ctx");
+    const toastEl = document.getElementById("toast");
 
     const THREAD_KEY = "qhsse_thread_id";
     let threadId = localStorage.getItem(THREAD_KEY) || null;
-    updateCtxBadge();
 
     async function ask(){
       const question = qEl.value.trim();
       if (!question) { qEl.focus(); return; }
       setBusy(true);
       try {
-        // Efface le champ + remet le focus pour enchaîner
+        // Effacer immédiatement + refocus pour enchaîner
         qEl.value = "";
         setTimeout(() => qEl.focus(), 0);
 
@@ -103,7 +120,6 @@
         if (data?.threadId && data.threadId !== threadId) {
           threadId = data.threadId;
           localStorage.setItem(THREAD_KEY, threadId);
-          updateCtxBadge();
         }
 
         if (data?.answer) outEl.textContent = data.answer;
@@ -125,17 +141,22 @@
     function resetThread(){
       threadId = null;
       localStorage.removeItem(THREAD_KEY);
-      updateCtxBadge();
+      // feedback visible : texte dans la zone de réponse + toast vert
       outEl.classList.add("muted");
-      outEl.textContent = "Nouveau sujet créé. Pose ta question.";
+      outEl.textContent = "🆕 Nouveau sujet activé. Pose ta première question.";
+      showToast("Nouveau sujet activé");
       qEl.focus();
     }
 
-    function updateCtxBadge(){
-      ctxEl.textContent = threadId ? `Mode : conversation (id: ${threadId.slice(0,8)}…)` : "Mode : conversation (nouveau)";
+    function showToast(message){
+      toastEl.textContent = message || "OK";
+      toastEl.classList.add("show");
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => toastEl.classList.remove("show"), 1400);
     }
 
     goEl.addEventListener("click", ask);
+    resetEl.addEventListener("click", resetThread);
     qEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") ask(); });
 
     // test rapide ?q=...
@@ -145,6 +166,7 @@
   </script>
 </body>
 </html>
+
 
 
 
