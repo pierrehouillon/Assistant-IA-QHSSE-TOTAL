@@ -26,13 +26,20 @@
     .answer { white-space: pre-wrap; line-height:1.55; }
     .muted { color: var(--muted); }
     .loading { opacity: .7; }
-    .row { display:flex; gap:10px; }
-    input, button {
+    .row { display:flex; gap:10px; align-items:flex-end; }
+    textarea, button {
       border-radius: 12px; border: 1px solid #d1d5db;
-      font-size: 16px; padding: 14px;
+      font-size: 16px; padding: 12px 14px;
       touch-action: manipulation;
     }
-    input { flex: 1 1 auto; min-height: 46px; }
+    textarea {
+      flex: 1 1 auto;
+      min-height: 48px;
+      max-height: 120px;
+      resize: none;
+      line-height: 1.4;
+      overflow-y: auto;
+    }
     button {
       background:#111827; color:#fff; border:1px solid #111827;
       min-width: 100px; cursor: pointer;
@@ -40,12 +47,10 @@
     button:disabled { opacity:.6; cursor:not-allowed; }
 
     .toolbar { display:flex; gap:8px; align-items:center; justify-content:flex-end; }
-    /* on cache le badge de mode conversation */
     #ctx { display:none; }
 
     .note { font-size:14px; color:var(--muted); }
 
-    /* Toast de confirmation */
     .toast {
       position: fixed;
       left: 50%; bottom: calc(16px + env(safe-area-inset-bottom));
@@ -56,6 +61,10 @@
       opacity: 0; pointer-events: none; transition: opacity .2s ease;
     }
     .toast.show { opacity: 1; }
+
+    @media (max-width: 380px) {
+      button { min-width: 88px; font-size:15px; padding-inline:12px; }
+    }
   </style>
 </head>
 <body>
@@ -71,9 +80,13 @@
 
     <!-- Zone saisie -->
     <div class="row">
-      <input id="q"
-             placeholder="Pose ta question… (ex : Puis-je utiliser un escabeau ?)"
-             inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" enterkeyhint="send" />
+      <textarea id="q"
+        placeholder="Pose ta question… (ex : Puis-je utiliser un escabeau ?)"
+        rows="1"
+        inputmode="text"
+        autocomplete="off"
+        autocapitalize="off"
+        autocorrect="off"></textarea>
       <button id="go">Envoyer</button>
     </div>
 
@@ -83,7 +96,7 @@
     </p>
   </div>
 
-  <!-- petit toast de confirmation -->
+  <!-- Toast de confirmation -->
   <div id="toast" class="toast">Nouveau sujet activé</div>
 
   <script>
@@ -97,13 +110,20 @@
     const THREAD_KEY = "qhsse_thread_id";
     let threadId = localStorage.getItem(THREAD_KEY) || null;
 
+    // 🔹 Ajuste automatiquement la hauteur du textarea
+    qEl.addEventListener("input", () => {
+      qEl.style.height = "auto";
+      qEl.style.height = Math.min(qEl.scrollHeight, 120) + "px";
+    });
+
     async function ask(){
       const question = qEl.value.trim();
       if (!question) { qEl.focus(); return; }
       setBusy(true);
       try {
-        // Effacer immédiatement + refocus pour enchaîner
+        // Efface le champ + refocus
         qEl.value = "";
+        qEl.style.height = "48px";
         setTimeout(() => qEl.focus(), 0);
 
         outEl.classList.remove("muted");
@@ -141,7 +161,6 @@
     function resetThread(){
       threadId = null;
       localStorage.removeItem(THREAD_KEY);
-      // feedback visible : texte dans la zone de réponse + toast vert
       outEl.classList.add("muted");
       outEl.textContent = "🆕 Nouveau sujet activé. Pose ta première question.";
       showToast("Nouveau sujet activé");
@@ -156,8 +175,12 @@
     }
 
     goEl.addEventListener("click", ask);
+    qEl.addEventListener("keydown", (e)=>{
+      if (e.key==="Enter" && !e.shiftKey) { // shift+enter = saut de ligne
+        e.preventDefault(); ask();
+      }
+    });
     resetEl.addEventListener("click", resetThread);
-    qEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") ask(); });
 
     // test rapide ?q=...
     const u = new URL(window.location.href);
@@ -166,7 +189,3 @@
   </script>
 </body>
 </html>
-
-
-
-
