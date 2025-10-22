@@ -1,14 +1,14 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const VECTOR_STORE_ID = process.env.VECTOR_STORE_ID;
-
-// CORS basique
+// CORS simple
 function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");           // ou ton domaine Glide si tu veux restreindre
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
+
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const ASST_ID = process.env.ASST_ID;
 
 export default async function handler(req, res) {
   setCors(res);
@@ -16,52 +16,50 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Méthode non autorisée" });
 
   try {
+    if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: "OPENAI_API_KEY manquante" });
+    if (!ASST_ID) return res.status(500).json({ error: "ASST_ID manquante" });
+
     const { question } = req.body || {};
     if (!question) return res.status(400).json({ error: "Question manquante" });
-    if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: "OPENAI_API_KEY manquante" });
-    if (!VECTOR_STORE_ID) return res.status(500).json({ error: "VECTOR_STORE_ID manquante" });
 
-    const response = await client.responses.create({
-      model: "gpt-4o-mini",
-      // ⚠️ Le schéma 'input' doit être une liste de messages avec des "content parts"
-      input: [
-        {
-          role: "system",
-          content: [
-            {
-              type: "text",
-              text:
-                "Tu es un assistant QHSSE. Réponds uniquement à partir du document QHSSE TOTAL. " +
-                'Si la réponse n’est pas dans le document, dis : "Non précisé dans le document QHSSE TOTAL." ' +
-                "Réponds en français, de manière claire et concise.",
-            },
-          ],
-        },
+    // 1) Créer un thread avec le message de l’utilisateur
+    const thread = await client.beta.threads.create({
+      messages: [
         {
           role: "user",
-          content: [{ type: "input_text", text: question }],
-        },
-      ],
-
-      // On active l’outil de recherche
-      tools: [{ type: "file_search" }],
-      tool_choice: "auto",
-
-      // ✅ C'est ICI qu'on branche le Vector Store
-      tool_resources: {
-        file_search: { vector_store_ids: [VECTOR_STORE_ID] },
-      },
-
-      max_output_tokens: 400,
+          content: [
+            { type: "text", text: question }
+          ]
+        }
+      ]
     });
 
-    const answer = response.output_text?.trim() || "Aucune réponse.";
-    return res.status(200).json({ answer });
+    // 2) Lancer un run sur l’assistant
+    let run = await client.beta.threads.runs.create(thread.id, {
+      assistant_id: ASST_ID
+    });
+
+    // 3) Polling jusqu’à "completed" (timeout simple)
+    const started = Date.now();
+    while (run.status !== "completed") {
+      if (["failed", "cancelled", "expired"].includes(run.status)) {
+        throw new Error(`Run ${run.status}`);
+      }
+      if (Date.now() - started > 30000) { // 30s
+        throw new Error("Timeout de génération");
+      }
+      await new Promise(r => setTimeout(r, 1000));
+      run = await client.beta.threads.runs.retrieve(thread.id, run.id);
+    }
+
+    // 4) Récupérer la dernière réponse de l’assistant
+    const msgs = await client.beta.threads.messages.list(thread.id, { order: "desc", limit: 1 });
+    const last = msgs.data[0];
+    const text = last?.content?.[0]?.type === "text" ? last.content[0].text.value : null;
+
+    res.status(200).json({ answer: text || "Aucune réponse." });
   } catch (e) {
-    // renvoyer l'erreur brute aide au debug dans l'onglet Network
-    return res.status(500).json({
-      error: e?.message || "Erreur serveur",
-      raw: e?.response?.data || null,
-    });
+    console.error(e);
+    res.status(500).json({ error: e?.message || "Erreur serveur" });
   }
 }
