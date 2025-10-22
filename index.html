@@ -3,70 +3,122 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Assistant QHSSE TOTAL</title>
+  <title>Assistant (webview)</title>
   <style>
     :root { --gap: 12px; }
     * { box-sizing: border-box; }
     body{font-family:system-ui,Arial;margin:0;padding:16px;max-width:800px}
     header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-    h1{font-size:20px;margin:0}
     .card{border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin:12px 0}
     .row{display:flex;gap:var(--gap)}
     input,button{font-size:16px;padding:12px;border-radius:10px;border:1px solid #d1d5db}
     input{flex:1}
     button{cursor:pointer}
-    .answer{white-space:pre-wrap;line-height:1.4}
+    .answer{white-space:pre-wrap;line-height:1.5}
     .muted{color:#6b7280;font-size:14px;margin-top:8px}
     .loading{opacity:0.7}
+    .toolbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px}
+    .pill{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid #e5e7eb;background:#f9fafb}
   </style>
 </head>
 <body>
-  <!-- Titre supprimé, tu l’ajouteras toi-même dans Glide -->
+  <!-- Pas de titre ici : tu le mets dans Glide -->
 
   <div class="card">
     <div class="row" style="margin-bottom:var(--gap);">
       <input id="q" placeholder="Pose ta question… (ex : Puis-je utiliser un escabeau ?)" />
       <button id="go">Envoyer</button>
     </div>
-    <div id="out" class="answer muted">Aucune question posée pour l’instant.</div>
+
+    <div class="toolbar">
+      <span id="ctx" class="pill">Mode : conversation</span>
+      <button id="reset" title="Oublier le contexte (nouveau sujet)">Nouveau sujet</button>
+    </div>
+
+    <div id="out" class="answer muted" style="margin-top:12px;">Aucune question posée pour l’instant.</div>
   </div>
 
   <p class="muted">
     Les réponses proviennent exclusivement du manuel <strong>Sécurité Travaux Réseau 2025</strong> de TotalEnergies.
-  Si l'information n'est pas présente, la réponse l'indiquera explicitement.
+    Si l'information n'est pas présente, la réponse l'indiquera explicitement.
   </p>
 
   <script>
-    // Comme la page et l'API sont sur le même domaine Vercel, on appelle l'API en relatif :
+    // API sur le même domaine Vercel
     const API_URL = "/api/ask";
 
     const qEl = document.getElementById("q");
     const goEl = document.getElementById("go");
     const outEl = document.getElementById("out");
+    const resetEl = document.getElementById("reset");
+    const ctxEl = document.getElementById("ctx");
+
+    // Thread persistant (contexte) stocké côté client
+    const THREAD_KEY = "qhsse_thread_id";
+    let threadId = localStorage.getItem(THREAD_KEY) || null;
+
+    updateCtxBadge();
 
     async function ask(){
       const question = qEl.value.trim();
       if(!question) return;
-      outEl.textContent = "⏳ Recherche dans le document…";
-      outEl.classList.add("loading");
+      setBusy(true);
       try{
+        outEl.classList.remove("muted");
+        outEl.textContent = "⏳ Recherche dans le document…";
+
+        const payload = { question };
+        if (threadId) payload.threadId = threadId;
+
         const r = await fetch(API_URL, {
           method:"POST",
           headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ question })
+          body: JSON.stringify(payload)
         });
+
         const data = await r.json();
-        outEl.classList.remove("muted");
-        outEl.textContent = data?.answer || "❌ Pas de réponse.";
+
+        if (data?.threadId && data.threadId !== threadId) {
+          threadId = data.threadId;
+          localStorage.setItem(THREAD_KEY, threadId);
+          updateCtxBadge();
+        }
+
+        if (data?.answer) {
+          outEl.textContent = data.answer;
+        } else if (data?.error) {
+          outEl.textContent = "❌ Erreur : " + data.error;
+        } else {
+          outEl.textContent = "❌ Pas de réponse.";
+        }
       }catch(e){
         outEl.classList.remove("muted");
         outEl.textContent = "❌ Erreur : " + (e?.message || "requête échouée");
       }finally{
-        outEl.classList.remove("loading");
+        setBusy(false);
       }
     }
 
+    function setBusy(b){
+      qEl.disabled = b; goEl.disabled = b; resetEl.disabled = b;
+      if (b) outEl.classList.add("loading"); else outEl.classList.remove("loading");
+    }
+
+    function resetThread(){
+      threadId = null;
+      localStorage.removeItem(THREAD_KEY);
+      updateCtxBadge();
+      outEl.classList.add("muted");
+      outEl.textContent = "Nouveau sujet créé. Pose ta question.";
+      qEl.focus();
+    }
+
+    function updateCtxBadge(){
+      ctxEl.textContent = threadId ? `Mode : conversation (id: ${threadId.slice(0,8)}…)` : "Mode : conversation (nouveau)";
+    }
+
     goEl.addEventListener("click", ask);
+    resetEl.addEventListener("click", resetThread);
     qEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") ask(); });
 
     // support ?q=... pour tests
@@ -76,6 +128,3 @@
   </script>
 </body>
 </html>
-
-
-
