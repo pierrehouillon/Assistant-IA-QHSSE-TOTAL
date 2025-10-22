@@ -22,6 +22,27 @@ async function readJsonBody(req) {
   try { return JSON.parse(raw || "{}"); } catch { return {}; }
 }
 
+// 🧹 Supprime les mentions de sources/citations dans le texte
+function cleanAnswer(text = "") {
+  return (
+    text
+      // [source: ...] ou (source ...)
+      .replace(/\[source[^\]]*\]/gi, "")
+      .replace(/\(source[^\)]*\)/gi, "")
+      // Lignes "Source: ..." / "Sources: ..."
+      .replace(/^\s*sources?\s*:\s*.*$/gim, "")
+      // Références numérotées [1], [12]
+      .replace(/(\s|^)\[\d+\](?=\s|$)/g, " ")
+      // Marques style  (certaines UIs)
+      .replace(/【\d+[^】]*】/g, "")
+      // Espaces multiples / lignes vides consécutives
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]{2,}/g, " ")
+      .trim()
+  );
+}
+
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(200).end();
@@ -62,11 +83,13 @@ export default async function handler(req, res) {
     // 4) Récupérer la dernière réponse
     const msgs = await client.beta.threads.messages.list(threadId, { order: "desc", limit: 5 });
     const assistantMsg = msgs.data.find((m) => m.role === "assistant");
-    const answer =
+    const rawAnswer =
       assistantMsg?.content
         ?.map((c) => (c.type === "text" ? c.text.value : ""))
         .join("\n")
         .trim() || "Non précisé dans le document.";
+
+    const answer = cleanAnswer(rawAnswer);
 
     return res.status(200).json({ answer, threadId });
   } catch (e) {
@@ -74,4 +97,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e?.message || "Erreur serveur" });
   }
 }
+
+
 
