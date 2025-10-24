@@ -9,7 +9,7 @@ function setCors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
-// Lecture corps JSON « à la main » (compatible Vercel)
+// Lecture JSON compatible Vercel
 async function readJson(req) {
   if (req.body && typeof req.body === "object") return req.body;
   return await new Promise((resolve) => {
@@ -19,6 +19,14 @@ async function readJson(req) {
       try { resolve(JSON.parse(raw || "{}")); } catch { resolve({}); }
     });
   });
+}
+
+// Télécharge une image en Buffer depuis une URL https://
+async function downloadImageAsBuffer(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Téléchargement image échoué (${r.status})`);
+  const ab = await r.arrayBuffer();
+  return Buffer.from(ab);
 }
 
 export default async function handler(req, res) {
@@ -32,13 +40,22 @@ export default async function handler(req, res) {
 
     const { text, image_url } = await readJson(req);
 
-    if (!image_url || !/^https?:\/\//i.test(image_url)) {
-      return res.status(400).json({ error: "Image manquante ou URL invalide (https://... requis)" });
-    }
     if (!text || typeof text !== "string") {
       return res.status(400).json({ error: "Texte descriptif manquant" });
     }
+    if (!image_url || !/^https?:\/\//i.test(image_url)) {
+      return res.status(400).json({ error: "Image manquante ou URL invalide (https://... requis)" });
+    }
 
+    // 1) Télécharger l'image et l'uploader chez OpenAI
+    const imgBuf = await downloadImageAsBuffer(image_url);
+    const file = await client.files.create({
+      file: new File([imgBuf], "photo.jpg", { type: "image/jpeg" }),
+      // Pour Assistants avec vision, le purpose approprié est "vision"
+      purpose: "vision"
+    });
+
+    // 2) Créer un thread avec texte + image_file (PAS image_url)
     const prompt = `
 Tu es un assistant QHSE expert en sécurité sur chantier.
 Analyse la situation suivante à partir de la photo et du texte fourni :
@@ -49,25 +66,23 @@ Réponds en 4 rubriques claires (sans bloc "source") :
 2) EPI à porter
 3) Documents et vérifications préalables
 4) Bonnes pratiques de sécurité
-`;
+`.trim();
 
-    // 1) thread avec texte + image_url
     const thread = await client.beta.threads.create({
       messages: [
         {
           role: "user",
           content: [
             { type: "text", text: prompt },
-            { type: "image_url", image_url }
+            { type: "image_file", image_file: { file_id: file.id } }
           ]
         }
       ]
     });
 
-    // 2) run assistant
+    // 3) Lancer le run et attendre la fin
     let run = await client.beta.threads.runs.create(thread.id, { assistant_id: ASST_ID });
 
-    // 3) polling simple
     const start = Date.now();
     while (run.status !== "completed") {
       if (["failed", "cancelled", "expired"].includes(run.status)) {
@@ -78,7 +93,7 @@ Réponds en 4 rubriques claires (sans bloc "source") :
       run = await client.beta.threads.runs.retrieve(thread.id, run.id);
     }
 
-    // 4) récupérer la réponse
+    // 4) Récupérer la réponse
     const msgs = await client.beta.threads.messages.list(thread.id, { order: "desc", limit: 1 });
     const last = msgs.data[0];
     const answer = (last?.content?.[0]?.type === "text")
