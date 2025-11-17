@@ -3,15 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
-  <title>Assistant Sécurité Réseau 2025</title>
+  <title>Assistant Échafaudage ALTRAD METRIX</title>
 
-  <!-- Police Inter (comme Glide) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
   <style>
     :root{
-      --gap:12px; --radius:14px; --border:#e5e7eb; --muted:#6b7280; --primary:#d71920;
-      --bg-soft:#fafafa; --ok:#059669;
+      --gap:12px; --radius:14px; --border:#e5e7eb; --muted:#6b7280; --primary:#2563eb;
+      --bg-soft:#fafafa;
     }
     *{box-sizing:border-box}
     body{
@@ -53,7 +52,7 @@
       border:none; background:var(--primary); color:#fff; font-weight:500; cursor:pointer;
       transition:background .2s;
     }
-    button.primary:hover{background:#b41319}
+    button.primary:hover{background:#1d4ed8}
 
     .answer{white-space:pre-wrap; line-height:1.5; margin-top:12px}
     .muted{color:var(--muted); font-size:14px; margin-top:10px}
@@ -67,23 +66,22 @@
 </head>
 <body>
 
-  <!-- Barre discrète : bouton + confirmation -->
   <div class="topbar">
-    <span id="flash" class="flash">🆕 Nouveau sujet lancé</span>
-    <button id="newTopic" class="ghost-btn" aria-label="Nouveau sujet">Nouveau sujet</button>
+    <span id="flash" class="flash">🆕 Nouveau chantier</span>
+    <button id="newTopic" class="ghost-btn" aria-label="Nouveau chantier">Nouveau chantier</button>
   </div>
 
   <div class="card">
     <div class="row" style="margin-bottom:12px;">
-      <input id="q" placeholder="Pose ta question… (ex : Puis-je utiliser un escabeau ?)" />
+      <input id="q" placeholder="Décris ton besoin (ex : échafaudage 5 m de long × 6 m de haut)..." />
       <button id="go" class="primary">Envoyer</button>
     </div>
-    <div id="out" class="answer muted">Aucune question posée pour l’instant.</div>
+    <div id="out" class="answer muted">Aucun chantier en cours. Décris ton premier échafaudage.</div>
   </div>
 
   <p class="muted">
-    Les réponses proviennent exclusivement du manuel <strong>Sécurité Travaux Réseau 2025</strong> de TotalEnergies.
-    Si l'information n'est pas présente, la réponse l'indiquera explicitement.
+    Les réponses proviennent des documents <strong>ALTRAD METRIX</strong> fournis (notice fabricant et bon de commande interne)
+    et des règles de calcul intégrées dans l'assistant. Si une information manque, la réponse l'indiquera.
   </p>
 
   <script>
@@ -95,8 +93,8 @@
     const newBtn = document.getElementById("newTopic");
     const flash = document.getElementById("flash");
 
-    // On retient le thread courant en local pour enchaîner les questions
-    let threadId = localStorage.getItem("q_thread") || null;
+    // Thread pour ce chantier (comme QHSSE, mais clé différente)
+    let threadId = localStorage.getItem("metrix_thread") || null;
 
     function showFlash() {
       flash.classList.add("show");
@@ -105,11 +103,11 @@
 
     function startNewTopic() {
       threadId = null;
-      localStorage.removeItem("q_thread");
+      localStorage.removeItem("metrix_thread");
       qEl.value = "";
       qEl.focus();
       outEl.classList.add("muted");
-      outEl.textContent = "Nouveau sujet démarré. Pose ta première question.";
+      outEl.textContent = "Nouveau chantier démarré. Donne-moi la longueur et la hauteur de ta façade.";
       showFlash();
     }
 
@@ -117,7 +115,7 @@
       const question = qEl.value.trim();
       if (!question) return;
 
-      outEl.textContent = "⏳ Recherche dans le document…";
+      outEl.textContent = "⏳ Calcul de l'échafaudage en cours…";
       outEl.classList.add("loading");
 
       try {
@@ -128,16 +126,13 @@
         });
         const data = await r.json();
 
-        // on mémorise le thread renvoyé (pour conversation continue)
         if (data?.threadId) {
           threadId = data.threadId;
-          localStorage.setItem("q_thread", threadId);
+          localStorage.setItem("metrix_thread", threadId);
         }
 
         outEl.classList.remove("muted");
         outEl.textContent = data?.answer || "❌ Pas de réponse.";
-
-        // vider le champ et remettre le focus
         qEl.value = "";
         qEl.focus();
       } catch (e) {
@@ -152,7 +147,7 @@
     goEl.addEventListener("click", ask);
     qEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") ask(); });
 
-    // Support test avec ?q=
+    // Support test ?q=... pour démo rapide
     const u = new URL(window.location.href);
     const initial = u.searchParams.get("q");
     if (initial) { startNewTopic(); qEl.value = initial; ask(); }
