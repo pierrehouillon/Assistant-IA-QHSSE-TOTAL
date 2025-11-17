@@ -1,3 +1,4 @@
+// api/ask.js
 import OpenAI from "openai";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -26,7 +27,7 @@ async function readJsonBody(req) {
   }
 }
 
-// Nettoyage des citations / sources parasites
+// Nettoyage des petites références [1], Sources, etc.
 function cleanAnswer(text = "") {
   return (
     text
@@ -42,37 +43,20 @@ function cleanAnswer(text = "") {
   );
 }
 
-// 🔍 extrait "X m de long" + "Y m de haut" dans un texte
-function extractLengthHeight(text = "") {
-  const lower = text.toLowerCase();
-
-  const hasLong = lower.includes("long") || lower.includes("longueur");
-  const hasHaut = lower.includes("haut") || lower.includes("hauteur");
-  if (!hasLong || !hasHaut) return null;
-
-  // on récupère toutes les valeurs en mètres : "5 m", "6,5 m"...
-  const regex = /(\d+(?:[.,]\d+)?)\s*m\b/g;
-  const matches = [...lower.matchAll(regex)];
-  if (matches.length < 2) return null;
-
-  const L = parseFloat(matches[0][1].replace(",", "."));
-  const H = parseFloat(matches[1][1].replace(",", "."));
-  if (isNaN(L) || isNaN(H)) return null;
-
-  return { L, H };
-}
-
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST")
+  if (req.method !== "POST") {
     return res.status(405).json({ error: "Méthode non autorisée" });
+  }
 
   try {
-    if (!process.env.OPENAI_API_KEY)
+    if (!process.env.OPENAI_API_KEY) {
       return res.status(500).json({ error: "OPENAI_API_KEY manquante" });
-    if (!ASST_ID)
+    }
+    if (!ASST_ID) {
       return res.status(500).json({ error: "ASST_ID manquante" });
+    }
 
     const { question, threadId: incomingThreadId } = await readJsonBody(req);
     if (!question || typeof question !== "string") {
@@ -80,55 +64,27 @@ export default async function handler(req, res) {
     }
 
     let threadId = incomingThreadId || null;
-    let questionToSend = question;
 
-    // 🟦 Si NOUVEAU chantier et que la phrase contient déjà longueur + hauteur
-    if (!threadId) {
-      const dims = extractLengthHeight(question);
-      if (dims) {
-        const { L, H } = dims;
-        questionToSend = `
-L'utilisateur commence un NOUVEAU chantier d'échafaudage ALTRAD METRIX.
-
-Les dimensions de base sont déjà DÉFINIES et NE DOIVENT JAMAIS être redemandées :
-- Type : échafaudage droit de façade.
-- Longueur : ${L} m.
-- Hauteur : ${H} m.
-
-Tu dois considérer ces valeurs comme officielles du début à la fin
-et NE PAS reposer de question du type "donne-moi la longueur et la hauteur".
-
-Ensuite, applique tes règles normales :
-- tu poses la question sécurité "Souhaites-tu protéger la façade côté mur ? (⚠ obligatoire si espace > 20 cm)",
-- puis la question sur le grutage,
-- puis tu calcules la liste de matériel complète (avec tableau, poids, rappel sécurité, phrase Peduzzi, etc.).
-
-Pour info, voici la formulation exacte de l'utilisateur :
-"${question}"
-        `.trim();
-      }
-    }
-
-    // 1) Créer un thread si besoin
+    // 1) Créer un thread si besoin (nouveau chantier)
     if (!threadId) {
       const created = await client.beta.threads.create();
       threadId = created.id;
     }
 
-    // 2) Ajouter le message user au thread
+    // 2) Ajouter le message utilisateur
     await client.beta.threads.messages.create(threadId, {
       role: "user",
-      content: questionToSend,
+      content: question,
     });
 
-    // 3) Lancer le run et attendre la fin
+    // 3) Lancer le run de l'Assistant METRIX
     const run = await client.beta.threads.runs.createAndPoll(threadId, {
       assistant_id: ASST_ID,
     });
 
     if (run.status !== "completed") {
       return res.status(200).json({
-        answer: `La réponse n'est pas complète (état du run : ${run.status}).`,
+        answer: `La réponse n'est pas complète (run: ${run.status}).`,
         threadId,
       });
     }
@@ -149,7 +105,7 @@ Pour info, voici la formulation exacte de l'utilisateur :
 
     return res.status(200).json({ answer, threadId });
   } catch (e) {
-    console.error("ask echafaudage:", e?.response?.data || e);
+    console.error("ask METRIX:", e?.response?.data || e);
     return res.status(500).json({ error: e?.message || "Erreur serveur" });
   }
 }
