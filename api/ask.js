@@ -1,4 +1,3 @@
-// api/ask.js
 import OpenAI from "openai";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -11,7 +10,7 @@ function setCors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
-// Lecture JSON compatible Vercel
+// Parse body si Vercel n'a pas fait le parsing (sécurité)
 async function readJsonBody(req) {
   if (req.body && typeof req.body === "object") return req.body;
   const raw = await new Promise((resolve, reject) => {
@@ -27,15 +26,20 @@ async function readJsonBody(req) {
   }
 }
 
-// Nettoyage des petites références [1], Sources, etc.
+// 🧹 Supprime les mentions de sources/citations dans le texte
 function cleanAnswer(text = "") {
   return (
     text
+      // [source: ...] ou (source ...)
       .replace(/\[source[^\]]*\]/gi, "")
       .replace(/\(source[^\)]*\)/gi, "")
+      // Lignes "Source: ..." / "Sources: ..."
       .replace(/^\s*sources?\s*:\s*.*$/gim, "")
+      // Références numérotées [1], [12]
       .replace(/(\s|^)\[\d+\](?=\s|$)/g, " ")
+      // Marques style  (certaines UIs)
       .replace(/【\d+[^】]*】/g, "")
+      // Espaces multiples / lignes vides consécutives
       .replace(/[ \t]+\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
       .replace(/[ \t]{2,}/g, " ")
@@ -46,17 +50,14 @@ function cleanAnswer(text = "") {
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") {
+  if (req.method !== "POST")
     return res.status(405).json({ error: "Méthode non autorisée" });
-  }
 
   try {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.OPENAI_API_KEY)
       return res.status(500).json({ error: "OPENAI_API_KEY manquante" });
-    }
-    if (!ASST_ID) {
+    if (!ASST_ID)
       return res.status(500).json({ error: "ASST_ID manquante" });
-    }
 
     const { question, threadId: incomingThreadId } = await readJsonBody(req);
     if (!question || typeof question !== "string") {
@@ -65,31 +66,30 @@ export default async function handler(req, res) {
 
     let threadId = incomingThreadId || null;
 
-    // 1) Créer un thread si besoin (nouveau chantier)
+    // 1) Créer un thread si besoin
     if (!threadId) {
       const created = await client.beta.threads.create();
       threadId = created.id;
     }
 
-    // 2) Ajouter le message utilisateur
+    // 2) Ajouter le message user au thread
     await client.beta.threads.messages.create(threadId, {
       role: "user",
       content: question,
     });
 
-    // 3) Lancer le run de l'Assistant METRIX
+    // 3) Lancer le run et attendre la fin (createAndPoll simplifie)
     const run = await client.beta.threads.runs.createAndPoll(threadId, {
       assistant_id: ASST_ID,
     });
 
     if (run.status !== "completed") {
-      return res.status(200).json({
-        answer: `La réponse n'est pas complète (run: ${run.status}).`,
-        threadId,
-      });
+      return res
+        .status(200)
+        .json({ answer: `Non précisé (run: ${run.status}).`, threadId });
     }
 
-    // 4) Récupérer la dernière réponse assistant
+    // 4) Récupérer la dernière réponse
     const msgs = await client.beta.threads.messages.list(threadId, {
       order: "desc",
       limit: 5,
@@ -99,13 +99,15 @@ export default async function handler(req, res) {
       assistantMsg?.content
         ?.map((c) => (c.type === "text" ? c.text.value : ""))
         .join("\n")
-        .trim() || "Pas de réponse.";
+        .trim() || "Non précisé dans le document.";
 
     const answer = cleanAnswer(rawAnswer);
 
     return res.status(200).json({ answer, threadId });
   } catch (e) {
-    console.error("ask METRIX:", e?.response?.data || e);
-    return res.status(500).json({ error: e?.message || "Erreur serveur" });
+    console.error("ask:", e?.response?.data || e);
+    return res
+      .status(500)
+      .json({ error: e?.message || "Erreur serveur" });
   }
 }
