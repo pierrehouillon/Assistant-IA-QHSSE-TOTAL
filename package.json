@@ -1,5 +1,5 @@
 {
-  "name": "assistant-ia-qhsse-total-v2",
+  "name": "assistant-ia-echafaudage-metrix",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -7,4 +7,3 @@
     "openai": "^4.58.1"
   }
 }
-
