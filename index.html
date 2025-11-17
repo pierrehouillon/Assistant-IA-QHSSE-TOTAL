@@ -3,33 +3,37 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
-  <title>Assistant Échafaudage ALTRAD METRIX</title>
+  <title>Assistant ALTRAD METRIX – Liste de matériel</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
   <style>
     :root{
       --gap:12px; --radius:14px; --border:#e5e7eb; --muted:#6b7280; --primary:#2563eb;
-      --bg-soft:#fafafa;
+      --bg-soft:#f9fafb;
     }
     *{box-sizing:border-box}
     body{
-      margin:0; padding:16px; max-width:800px;
+      margin:0; padding:16px; max-width:900px;
       font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      color:#111827; background:#fff; -webkit-font-smoothing:antialiased;
+      color:#111827; background:#ffffff; -webkit-font-smoothing:antialiased;
     }
+
+    h1{font-size:22px;margin:0 0 4px;font-weight:600}
+    .subtitle{color:var(--muted);font-size:14px;margin-bottom:16px}
+
     .topbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px}
     .ghost-btn{
       appearance:none;border:1px solid var(--border);background:#fff;color:#111827;
-      padding:8px 12px;border-radius:999px;font-size:14px;cursor:pointer;
+      padding:8px 12px;border-radius:999px;font-size:13px;cursor:pointer;
     }
-    .ghost-btn:hover{background:#f8f8f8}
+    .ghost-btn:hover{background:#f3f4f6}
 
     .flash{
       display:none; align-items:center; gap:8px;
       border:1px solid #d1fae5; background:#ecfdf5; color:#065f46;
-      padding:8px 12px; border-radius:999px; font-size:13px;
-      animation:fade 0.25s ease;
+      padding:6px 10px; border-radius:999px; font-size:12px;
+      animation:fade .25s ease;
     }
     .flash.show{display:inline-flex}
     @keyframes fade{from{opacity:.2;transform:translateY(-2px)}to{opacity:1;transform:none}}
@@ -37,6 +41,7 @@
     .card{
       border:1px solid var(--border); border-radius:var(--radius);
       padding:16px; margin:12px 0; box-shadow:0 2px 4px rgba(0,0,0,.04);
+      background:#fff;
     }
     .row{display:flex;gap:var(--gap); align-items:center}
 
@@ -54,34 +59,43 @@
     }
     button.primary:hover{background:#1d4ed8}
 
-    .answer{white-space:pre-wrap; line-height:1.5; margin-top:12px}
+    .answer{white-space:pre-wrap; line-height:1.5; margin-top:12px;font-size:14px}
     .muted{color:var(--muted); font-size:14px; margin-top:10px}
     .loading{opacity:.7}
 
     @media (max-width:600px){
       input,button.primary{font-size:15px}
       .topbar{justify-content:space-between}
+      h1{font-size:19px}
     }
   </style>
 </head>
 <body>
 
   <div class="topbar">
-    <span id="flash" class="flash">🆕 Nouveau chantier</span>
+    <span id="flash" class="flash">🆕 Nouveau chantier démarré</span>
     <button id="newTopic" class="ghost-btn" aria-label="Nouveau chantier">Nouveau chantier</button>
   </div>
 
+  <h1>Assistant ALTRAD METRIX</h1>
+  <p class="subtitle">
+    Je t’aide à configurer ton échafaudage ALTRAD METRIX droit de façade (liste de matériel prête à commander).
+  </p>
+
   <div class="card">
     <div class="row" style="margin-bottom:12px;">
-      <input id="q" placeholder="Décris ton besoin (ex : échafaudage 5 m de long × 6 m de haut)..." />
+      <input id="q" placeholder="Ex. : Échafaudage de 5 m de long par 6 m de haut, façade droite, largeur 1 m…" />
       <button id="go" class="primary">Envoyer</button>
     </div>
-    <div id="out" class="answer muted">Aucun chantier en cours. Décris ton premier échafaudage.</div>
+    <div id="out" class="answer muted">
+      Aucune configuration saisie pour l’instant. Décris ton échafaudage (longueur, hauteur, et autres contraintes).
+    </div>
   </div>
 
   <p class="muted">
-    Les réponses proviennent des documents <strong>ALTRAD METRIX</strong> fournis (notice fabricant et bon de commande interne)
-    et des règles de calcul intégrées dans l'assistant. Si une information manque, la réponse l'indiquera.
+    Les réponses s’appuient sur la notice ALTRAD METRIX et le bon de commande interne Peduzzi.
+    L’assistant applique automatiquement les règles (travées, niveaux, garde-corps, plinthes, stabilisation, grutage, etc.).
+    À la fin, il affiche une liste complète de matériel avec le poids total.
   </p>
 
   <script>
@@ -93,7 +107,7 @@
     const newBtn = document.getElementById("newTopic");
     const flash = document.getElementById("flash");
 
-    // Thread pour ce chantier (comme QHSSE, mais clé différente)
+    // Thread courant mémorisé comme pour le QHSSE
     let threadId = localStorage.getItem("metrix_thread") || null;
 
     function showFlash() {
@@ -107,7 +121,7 @@
       qEl.value = "";
       qEl.focus();
       outEl.classList.add("muted");
-      outEl.textContent = "Nouveau chantier démarré. Donne-moi la longueur et la hauteur de ta façade.";
+      outEl.textContent = "Nouveau chantier démarré. Décris ton échafaudage (ex. : 5 m de long × 6 m de haut).";
       showFlash();
     }
 
@@ -115,7 +129,7 @@
       const question = qEl.value.trim();
       if (!question) return;
 
-      outEl.textContent = "⏳ Calcul de l'échafaudage en cours…";
+      outEl.textContent = "⏳ Calcul de l’échafaudage et de la liste de matériel…";
       outEl.classList.add("loading");
 
       try {
@@ -147,7 +161,7 @@
     goEl.addEventListener("click", ask);
     qEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") ask(); });
 
-    // Support test ?q=... pour démo rapide
+    // Support test ?q=
     const u = new URL(window.location.href);
     const initial = u.searchParams.get("q");
     if (initial) { startNewTopic(); qEl.value = initial; ask(); }
