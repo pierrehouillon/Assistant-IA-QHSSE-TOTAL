@@ -3,37 +3,34 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
-  <title>Assistant ALTRAD METRIX – Liste de matériel</title>
+  <title>Assistant Sécurité Réseau 2025</title>
 
+  <!-- Police Inter (comme Glide) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
   <style>
     :root{
-      --gap:12px; --radius:14px; --border:#e5e7eb; --muted:#6b7280; --primary:#2563eb;
-      --bg-soft:#f9fafb;
+      --gap:12px; --radius:14px; --border:#e5e7eb; --muted:#6b7280; --primary:#d71920;
+      --bg-soft:#fafafa; --ok:#059669;
     }
     *{box-sizing:border-box}
     body{
-      margin:0; padding:16px; max-width:900px;
+      margin:0; padding:16px; max-width:800px;
       font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      color:#111827; background:#ffffff; -webkit-font-smoothing:antialiased;
+      color:#111827; background:#fff; -webkit-font-smoothing:antialiased;
     }
-
-    h1{font-size:22px;margin:0 0 4px;font-weight:600}
-    .subtitle{color:var(--muted);font-size:14px;margin-bottom:16px}
-
     .topbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px}
     .ghost-btn{
       appearance:none;border:1px solid var(--border);background:#fff;color:#111827;
-      padding:8px 12px;border-radius:999px;font-size:13px;cursor:pointer;
+      padding:8px 12px;border-radius:999px;font-size:14px;cursor:pointer;
     }
-    .ghost-btn:hover{background:#f3f4f6}
+    .ghost-btn:hover{background:#f8f8f8}
 
     .flash{
       display:none; align-items:center; gap:8px;
       border:1px solid #d1fae5; background:#ecfdf5; color:#065f46;
-      padding:6px 10px; border-radius:999px; font-size:12px;
-      animation:fade .25s ease;
+      padding:8px 12px; border-radius:999px; font-size:13px;
+      animation:fade 0.25s ease;
     }
     .flash.show{display:inline-flex}
     @keyframes fade{from{opacity:.2;transform:translateY(-2px)}to{opacity:1;transform:none}}
@@ -41,7 +38,6 @@
     .card{
       border:1px solid var(--border); border-radius:var(--radius);
       padding:16px; margin:12px 0; box-shadow:0 2px 4px rgba(0,0,0,.04);
-      background:#fff;
     }
     .row{display:flex;gap:var(--gap); align-items:center}
 
@@ -57,45 +53,37 @@
       border:none; background:var(--primary); color:#fff; font-weight:500; cursor:pointer;
       transition:background .2s;
     }
-    button.primary:hover{background:#1d4ed8}
+    button.primary:hover{background:#b41319}
 
-    .answer{white-space:pre-wrap; line-height:1.5; margin-top:12px;font-size:14px}
+    .answer{white-space:pre-wrap; line-height:1.5; margin-top:12px}
     .muted{color:var(--muted); font-size:14px; margin-top:10px}
     .loading{opacity:.7}
 
     @media (max-width:600px){
       input,button.primary{font-size:15px}
       .topbar{justify-content:space-between}
-      h1{font-size:19px}
     }
   </style>
 </head>
 <body>
 
+  <!-- Barre discrète : bouton + confirmation -->
   <div class="topbar">
-    <span id="flash" class="flash">🆕 Nouveau chantier démarré</span>
-    <button id="newTopic" class="ghost-btn" aria-label="Nouveau chantier">Nouveau chantier</button>
+    <span id="flash" class="flash">🆕 Nouveau sujet lancé</span>
+    <button id="newTopic" class="ghost-btn" aria-label="Nouveau sujet">Nouveau sujet</button>
   </div>
-
-  <h1>Assistant ALTRAD METRIX</h1>
-  <p class="subtitle">
-    Je t’aide à configurer ton échafaudage ALTRAD METRIX droit de façade (liste de matériel prête à commander).
-  </p>
 
   <div class="card">
     <div class="row" style="margin-bottom:12px;">
-      <input id="q" placeholder="Ex. : Échafaudage de 5 m de long par 6 m de haut, façade droite, largeur 1 m…" />
+      <input id="q" placeholder="Pose ta question… (ex : Puis-je utiliser un escabeau ?)" />
       <button id="go" class="primary">Envoyer</button>
     </div>
-    <div id="out" class="answer muted">
-      Aucune configuration saisie pour l’instant. Décris ton échafaudage (longueur, hauteur, et autres contraintes).
-    </div>
+    <div id="out" class="answer muted">Aucune question posée pour l’instant.</div>
   </div>
 
   <p class="muted">
-    Les réponses s’appuient sur la notice ALTRAD METRIX et le bon de commande interne Peduzzi.
-    L’assistant applique automatiquement les règles (travées, niveaux, garde-corps, plinthes, stabilisation, grutage, etc.).
-    À la fin, il affiche une liste complète de matériel avec le poids total.
+    Les réponses proviennent exclusivement du manuel <strong>Sécurité Travaux Réseau 2025</strong> de TotalEnergies.
+    Si l'information n'est pas présente, la réponse l'indiquera explicitement.
   </p>
 
   <script>
@@ -107,8 +95,8 @@
     const newBtn = document.getElementById("newTopic");
     const flash = document.getElementById("flash");
 
-    // Thread courant mémorisé comme pour le QHSSE
-    let threadId = localStorage.getItem("metrix_thread") || null;
+    // On retient le thread courant en local pour enchaîner les questions
+    let threadId = localStorage.getItem("q_thread") || null;
 
     function showFlash() {
       flash.classList.add("show");
@@ -117,11 +105,11 @@
 
     function startNewTopic() {
       threadId = null;
-      localStorage.removeItem("metrix_thread");
+      localStorage.removeItem("q_thread");
       qEl.value = "";
       qEl.focus();
       outEl.classList.add("muted");
-      outEl.textContent = "Nouveau chantier démarré. Décris ton échafaudage (ex. : 5 m de long × 6 m de haut).";
+      outEl.textContent = "Nouveau sujet démarré. Pose ta première question.";
       showFlash();
     }
 
@@ -129,7 +117,7 @@
       const question = qEl.value.trim();
       if (!question) return;
 
-      outEl.textContent = "⏳ Calcul de l’échafaudage et de la liste de matériel…";
+      outEl.textContent = "⏳ Recherche dans le document…";
       outEl.classList.add("loading");
 
       try {
@@ -140,13 +128,16 @@
         });
         const data = await r.json();
 
+        // on mémorise le thread renvoyé (pour conversation continue)
         if (data?.threadId) {
           threadId = data.threadId;
-          localStorage.setItem("metrix_thread", threadId);
+          localStorage.setItem("q_thread", threadId);
         }
 
         outEl.classList.remove("muted");
         outEl.textContent = data?.answer || "❌ Pas de réponse.";
+
+        // vider le champ et remettre le focus
         qEl.value = "";
         qEl.focus();
       } catch (e) {
@@ -161,7 +152,7 @@
     goEl.addEventListener("click", ask);
     qEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") ask(); });
 
-    // Support test ?q=
+    // Support test avec ?q=
     const u = new URL(window.location.href);
     const initial = u.searchParams.get("q");
     if (initial) { startNewTopic(); qEl.value = initial; ask(); }
