@@ -10,7 +10,7 @@ function setCors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
-// Parse body si Vercel n'a pas fait le parsing (sécurité)
+// Lecture JSON compatible Vercel
 async function readJsonBody(req) {
   if (req.body && typeof req.body === "object") return req.body;
   const raw = await new Promise((resolve, reject) => {
@@ -19,23 +19,22 @@ async function readJsonBody(req) {
     req.on("end", () => resolve(data));
     req.on("error", reject);
   });
-  try { return JSON.parse(raw || "{}"); } catch { return {}; }
+  try {
+    return JSON.parse(raw || "{}");
+  } catch {
+    return {};
+  }
 }
 
-// 🧹 Supprime les mentions de sources/citations dans le texte
+// Nettoyage des citations / sources parasites
 function cleanAnswer(text = "") {
   return (
     text
-      // [source: ...] ou (source ...)
       .replace(/\[source[^\]]*\]/gi, "")
       .replace(/\(source[^\)]*\)/gi, "")
-      // Lignes "Source: ..." / "Sources: ..."
       .replace(/^\s*sources?\s*:\s*.*$/gim, "")
-      // Références numérotées [1], [12]
       .replace(/(\s|^)\[\d+\](?=\s|$)/g, " ")
-      // Marques style  (certaines UIs)
       .replace(/【\d+[^】]*】/g, "")
-      // Espaces multiples / lignes vides consécutives
       .replace(/[ \t]+\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
       .replace(/[ \t]{2,}/g, " ")
@@ -46,11 +45,14 @@ function cleanAnswer(text = "") {
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Méthode non autorisée" });
+  if (req.method !== "POST")
+    return res.status(405).json({ error: "Méthode non autorisée" });
 
   try {
-    if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: "OPENAI_API_KEY manquante" });
-    if (!ASST_ID) return res.status(500).json({ error: "ASST_ID manquante" });
+    if (!process.env.OPENAI_API_KEY)
+      return res.status(500).json({ error: "OPENAI_API_KEY manquante" });
+    if (!ASST_ID)
+      return res.status(500).json({ error: "ASST_ID manquante" });
 
     const { question, threadId: incomingThreadId } = await readJsonBody(req);
     if (!question || typeof question !== "string") {
@@ -71,32 +73,35 @@ export default async function handler(req, res) {
       content: question,
     });
 
-    // 3) Lancer le run et attendre la fin (createAndPoll simplifie)
+    // 3) Lancer le run et attendre la fin
     const run = await client.beta.threads.runs.createAndPoll(threadId, {
       assistant_id: ASST_ID,
     });
 
     if (run.status !== "completed") {
-      return res.status(200).json({ answer: `Non précisé (run: ${run.status}).`, threadId });
+      return res.status(200).json({
+        answer: `La réponse n'est pas complète (état du run : ${run.status}).`,
+        threadId,
+      });
     }
 
-    // 4) Récupérer la dernière réponse
-    const msgs = await client.beta.threads.messages.list(threadId, { order: "desc", limit: 5 });
+    // 4) Récupérer la dernière réponse assistant
+    const msgs = await client.beta.threads.messages.list(threadId, {
+      order: "desc",
+      limit: 5,
+    });
     const assistantMsg = msgs.data.find((m) => m.role === "assistant");
     const rawAnswer =
       assistantMsg?.content
         ?.map((c) => (c.type === "text" ? c.text.value : ""))
         .join("\n")
-        .trim() || "Non précisé dans le document.";
+        .trim() || "Pas de réponse.";
 
     const answer = cleanAnswer(rawAnswer);
 
     return res.status(200).json({ answer, threadId });
   } catch (e) {
-    console.error("ask:", e?.response?.data || e);
+    console.error("ask echafaudage:", e?.response?.data || e);
     return res.status(500).json({ error: e?.message || "Erreur serveur" });
   }
 }
-
-
-
